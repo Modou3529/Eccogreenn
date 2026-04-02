@@ -863,8 +863,7 @@ async function callGemini(prompt,systemInstruction=''){
   if(!geminiKey){openApiModal();throw new Error('No API key.');}
   const body={
     contents:[{role:'user',parts:[{text:prompt}]}],
-    generationConfig:{maxOutputTokens:1200,temperature:1},
-    thinkingConfig:{thinkingBudget:0}
+    generationConfig:{maxOutputTokens:1200,temperature:0.9}
   };
   if(systemInstruction) body.systemInstruction={parts:[{text:systemInstruction}]};
   let res;
@@ -901,7 +900,7 @@ async function callGeminiChat(messages,systemInstruction=''){
   const trimmed=startIdx>=0?filtered.slice(startIdx):filtered;
   const contents=trimmed.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
   if(!contents.length) throw new Error('No messages to send.');
-  const body={contents,generationConfig:{maxOutputTokens:1200,temperature:1},thinkingConfig:{thinkingBudget:0}};
+  const body={contents,generationConfig:{maxOutputTokens:1200,temperature:0.9}};
   if(systemInstruction) body.systemInstruction={parts:[{text:systemInstruction}]};
   let res;
   try{
@@ -1026,12 +1025,17 @@ async function sendQuick(msg){
 async function doChat(){
   const sys=`You are Eco Green — a warm, friendly, encouraging AI engineering mentor for university students, created by Modou Jaw (Electrical & Electronics Engineering student, Year 3 Semester 2, University of Applied Science Engineering and Technology (USET)) as part of the Eco Green initiative. Speak like a supportive, knowledgeable older student. Use simple language. Use **bold** for key terms. Add an emoji or two. Specialise in Electrical, Civil, and Mechanical Engineering.`;
   try{
-    const msgs=chatHist.filter(m=>m.role!=='system');
+    // Strip system messages and ensure conversation starts with a user message
+    const allMsgs=chatHist.filter(m=>m.role==='user'||m.role==='assistant');
+    const firstUser=allMsgs.findIndex(m=>m.role==='user');
+    if(firstUser<0) throw new Error('No user message found.');
+    const msgs=allMsgs.slice(firstUser);
     const res=await callGeminiChat(msgs,sys);
+    if(!res) throw new Error('Empty response from Gemini.');
     chatHist.push({role:'assistant',content:res});
   }catch(e){
     if(!e.message.includes('API key'))
-      chatHist.push({role:'assistant',content:"Oops, something went a bit wrong! Could you try again? I'm still here for you! 😊"});
+      chatHist.push({role:'assistant',content:'Oops, something went wrong: '+e.message+' Please try again! 😊'});
   }finally{chatBusy=false;renderChat(false);}
 }
 async function ideaToChat(i){
